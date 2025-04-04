@@ -1,0 +1,57 @@
+from scapy.all import sniff, ICMP, Raw
+from colorama import Fore, Style
+
+def interceptar_icmp(paquete):
+    if ICMP in paquete and Raw in paquete and paquete[ICMP].type == 8:  # ICMP Type 8 = Echo Request
+        return paquete[Raw].load.decode(errors='ignore')
+    return None
+
+def descifrar_cesar(texto_cifrado):
+    palabras_comunes = ["el", "la", "de", "que", "y", "a", "los", "las", "es", "en"]
+    mejor_opcion = ""
+    mejor_puntaje = 0
+    
+    print("Probando todas las combinaciones:")
+    for desplazamiento in range(26):
+        resultado = ""
+        for caracter in texto_cifrado:
+            if caracter.isalpha():
+                ascii_offset = 65 if caracter.isupper() else 97
+                nuevo_caracter = chr((ord(caracter) - ascii_offset - desplazamiento) % 26 + ascii_offset)
+            else:
+                nuevo_caracter = caracter
+            resultado += nuevo_caracter
+        
+        puntaje = sum(resultado.lower().count(palabra) for palabra in palabras_comunes)
+        
+        if puntaje > mejor_puntaje:
+            mejor_puntaje = puntaje
+            mejor_opcion = resultado
+        
+        if resultado == mejor_opcion:
+            mejor_opcion_formateado = Fore.GREEN + f"Desplazamiento {desplazamiento}: {resultado}" + Style.RESET_ALL
+        else:
+            print(f"Desplazamiento {desplazamiento}: {resultado}")
+    
+    print(mejor_opcion_formateado)
+
+def capturar_mensaje():
+    mensaje_recibido = ""
+    print("Escuchando paquetes ICMP (solo requests)...")
+    
+    def procesar_paquete(paquete):
+        nonlocal mensaje_recibido
+        caracter = interceptar_icmp(paquete)
+        if caracter:
+            mensaje_recibido += caracter
+    
+    sniff(filter="icmp", prn=procesar_paquete, store=False, timeout=10)
+    print("Mensaje interceptado. Intentando descifrar...")
+    descifrar_cesar(mensaje_recibido)
+
+def main():
+    print("Iniciando MITM para capturar mensaje ICMP...")
+    capturar_mensaje()
+
+if __name__ == "__main__":
+    main()
